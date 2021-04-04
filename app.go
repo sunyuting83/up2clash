@@ -2,23 +2,39 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os/exec"
-	"runtime"
 	"strings"
-	"syscall"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	gin.SetMode(gin.ReleaseMode)
 	var (
-		geturl   string
-		suburl   string
-		sub      string
+		port string
+	)
+	flag.StringVar(&port, "p", "7893", "Default Port 7893")
+	flag.Parse()
+	app := gin.New()
+	app.GET("/", func(c *gin.Context) {
+		var geturl string = c.DefaultQuery("geturl", "https://pub-api-1.bianyuan.xyz")
+		var suburl string = c.DefaultQuery("suburl", "https://rss.srss.xyz/link/IBbFyr6dRelkPM0a?mu=2")
+		suburl = url.QueryEscape(suburl)
+		var exclude string = c.DefaultQuery("exclude", "%e7%be%8e%e5%9b%bd%7c%e7%88%b1%e6%b2%99%e5%b0%bc%e4%ba%9a%7c%e7%bd%97%e9%a9%ac%e5%b0%bc%e4%ba%9a%7c%e5%8a%a0%e6%8b%bf%e5%a4%a7%7c%e5%8c%97%e7%be%8e%7c%e4%bf%84%e7%bd%97%e6%96%af%7c%e5%85%8b%e7%bd%97%e5%9c%b0%e4%ba%9a%7c%e4%b9%8c%e5%85%8b%e5%85%b0%7c%e6%ac%a7%e7%9b%9f%7c%e6%91%a9%e5%b0%94%e5%a4%9a%e7%93%a6%7cBuLink%7c%e5%9f%83%e5%8f%8a%7c%e8%91%a1%e8%90%84%e7%89%99%7c%e6%8b%89%e8%84%b1%e7%bb%b4%e4%ba%9a%7c%e8%8b%b1%e5%9b%bd%7c%e8%a5%bf%e7%8f%ad%e7%89%99%7c%e7%91%9e%e5%85%b8%7c%e5%8d%a2%e6%a3%ae%e5%a0%a1%7c%e5%be%b7%e5%9b%bd%7c%e7%88%b1%e5%b0%94%e5%85%b0%7c%e6%b3%a2%e5%85%b0%7c%e6%8d%b7%e5%85%8b%7c%e6%84%8f%e5%a4%a7%e5%88%a9%7cisx.yt%7c%e8%8d%b7%e5%85%b0%7cNL%7cUS%7cDE%7cFR%7cAU%7cRU%7cRO%7cZZ%7cGB%7c%e5%8d%b0%e5%ba%a6%7c%e4%b8%b9%e9%ba%a6")
+		var ConfigPath string = c.DefaultQuery("config", "/etc/clash/config.yaml")
+		var command string = c.DefaultQuery("command", "/etc/clash/clash.sh restart")
+		var data string = GetData(geturl, suburl, exclude, ConfigPath, command)
+		c.String(200, data)
+	})
+	app.Run(strings.Join([]string{":", port}, ""))
+}
+
+func GetData(geturl string, suburl string, exclude string, ConfigPath string, command string) (b string) {
+	var (
 		url      string
-		local    bool
-		exclude  string = "%e7%be%8e%e5%9b%bd%7c%e7%88%b1%e6%b2%99%e5%b0%bc%e4%ba%9a%7c%e7%bd%97%e9%a9%ac%e5%b0%bc%e4%ba%9a%7c%e5%8a%a0%e6%8b%bf%e5%a4%a7%7c%e5%8c%97%e7%be%8e%7c%e4%bf%84%e7%bd%97%e6%96%af%7c%e5%85%8b%e7%bd%97%e5%9c%b0%e4%ba%9a%7c%e4%b9%8c%e5%85%8b%e5%85%b0%7c%e6%ac%a7%e7%9b%9f%7c%e6%91%a9%e5%b0%94%e5%a4%9a%e7%93%a6%7cBuLink%7c%e5%9f%83%e5%8f%8a%7c%e8%91%a1%e8%90%84%e7%89%99%7c%e6%8b%89%e8%84%b1%e7%bb%b4%e4%ba%9a%7c%e8%8b%b1%e5%9b%bd%7c%e8%a5%bf%e7%8f%ad%e7%89%99%7c%e7%91%9e%e5%85%b8%7c%e5%8d%a2%e6%a3%ae%e5%a0%a1%7c%e5%be%b7%e5%9b%bd%7c%e7%88%b1%e5%b0%94%e5%85%b0%7c%e6%b3%a2%e5%85%b0%7c%e6%8d%b7%e5%85%8b%7c%e6%84%8f%e5%a4%a7%e5%88%a9%7cisx.yt%7c%e8%8d%b7%e5%85%b0%7cNL%7cUS%7cDE%7cFR%7cAU%7cRU%7cRO%7cZZ%7cGB%7c%e5%8d%b0%e5%ba%a6%7c%e4%b8%b9%e9%ba%a6"
 		emoji    string = "true"
 		list     string = "false"
 		udp      string = "true"
@@ -26,7 +42,6 @@ func main() {
 		scv      string = "false"
 		fdn      string = "false"
 		sort     string = "false"
-		c        string = "d:\\clash\\config.yaml"
 		template string = `port: 7890
 socks-port: 7891
 allow-lan: true
@@ -37,7 +52,7 @@ log-level: silent
 external-controller: 0.0.0.0:9090
 redir-port: 7892
 secret: "123456"
-external-ui: "d:\\clash\\ui"
+external-ui: "/etc/clash/ui"
 dns:
   enable: true
   ipv6: false
@@ -136,7 +151,6 @@ dns:
       - 192.0.2.0/24
       - 192.88.99.0/24
       - 192.168.0.0/16
-      - 192.168.50.0/16
       - 198.18.0.0/15
       - 198.51.100.0/24
       - 203.0.113.0/24
@@ -145,51 +159,32 @@ dns:
       - 255.255.255.255/32
 #===================== Clash-General-Settings =====================#`
 	)
-	flag.StringVar(&geturl, "geturl", "http://127.0.0.1:25500", "请求网址")
-	flag.StringVar(&sub, "sub", "clash", "请求类型")
-	flag.StringVar(&suburl, "suburl", "http%3a%2f%2f127.0.0.1%3a5550%2f%3fw%3d1%26i%3d2", "订阅网址")
-	flag.StringVar(&c, "config", "d:\\clash\\config.yaml", "配置文件路径")
-	flag.BoolVar(&local, "local", false, "本地代理")
-	flag.Parse()
-	url = strings.Join([]string{geturl, "/sub?target=", sub, "&url=", suburl, "&exclude=", exclude, "&emoji=", emoji, "&list=", list, "&udp=", udp, "&tfo=", tfo, "&scv=", scv, "&fdn=", fdn, "&sort=", sort}, "")
+	url = strings.Join([]string{geturl, "/sub?target=clash", "&url=", suburl, "&exclude=", exclude, "&emoji=", emoji, "&list=", list, "&udp=", udp, "&tfo=", tfo, "&scv=", scv, "&fdn=", fdn, "&sort=", sort}, "")
 	res, errers := http.Get(url)
 	if errers != nil {
-		fmt.Println("get error")
-		return
+		return "get error"
 	}
 	if res != nil {
 		defer res.Body.Close()
 		if res.StatusCode != 200 {
-			// log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-			fmt.Println("status error")
-			return
+			return "status error"
 		}
 		s, _ := ioutil.ReadAll(res.Body)
-		if local {
-			ioutil.WriteFile(c, s, 0644)
-		} else {
-			d := string(s)
-			l := len(d)
-			e := strings.Index(d, "proxies:")
-			d = d[e : l-1]
-			dd := strings.Join([]string{template, d}, "\n")
-			var strtobyte []byte = []byte(dd)
-			ioutil.WriteFile(c, strtobyte, 0644)
+		d := string(s)
+		l := len(d)
+		e := strings.Index(d, "proxies:")
+		d = d[e : l-1]
+		dd := strings.Join([]string{template, d}, "\n")
+		var strtobyte []byte = []byte(dd)
+		serr := ioutil.WriteFile(ConfigPath, strtobyte, 0644)
+		if serr != nil {
+			return "bad path"
 		}
-		// fmt.Println(command)
-		cmd := exec.Command("cmd", "/C", "taskkill /F /IM clash64.exe")
+		cmd := exec.Command("/bin/sh", "-c", command)
 		if err := cmd.Run(); err != nil {
-			fmt.Println("run error")
-			return
+			return "run error"
 		}
-		cmder := exec.Command("cmd", "/C", "D:\\script\\start_clash.bat")
-		if runtime.GOOS == "windows" {
-			cmder.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-		}
-		if err := cmder.Run(); err != nil {
-			fmt.Println("run error")
-			return
-		}
-		return
+		return "OK"
 	}
+	return "OK"
 }
