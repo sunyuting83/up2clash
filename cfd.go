@@ -48,9 +48,17 @@ type ResultInfo struct {
 	TotalPages int `json:"total_pages"`
 }
 
+type PostData struct {
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	Proxied bool   `json:"proxied"`
+}
+
 func main() {
 	var (
-		proxy      string = "true"
+		CFApi      string = "https://api.cloudflare.com/client/v4/zones/"
+		proxy      bool   = false
 		username   string = os.Args[1]
 		password   string = os.Args[2]
 		hostname   string = os.Args[3]
@@ -64,23 +72,38 @@ func main() {
 			recordType = "AAAA"
 		}
 	}
-	recordIp, recordId, resSuccess := GetCurrentIP(username, password, hostname, recordType)
+	var CurrentUrl string = strings.Join([]string{CFApi, username, "/dns_records?type=", recordType, "&name=", hostname}, "")
+	recordId, recordIp, resSuccess := CloudFlareApi(CurrentUrl, "GET", password, []byte(""), true)
 	if resSuccess {
 		if recordIp == ipAddr {
 			fmt.Println("nochg")
 			return
 		}
+		data := MakePostData(proxy, ipAddr, hostname, recordType)
 		if recordId == "null" {
-			fmt.Println(recordId, proxy)
-			return
+			var createDnsApi string = strings.Join([]string{CFApi, username, "/dns_records"}, "")
+			_, _, success := CloudFlareApi(createDnsApi, "POST", password, data, false)
+			if success {
+				fmt.Println("good")
+				return
+			} else {
+				fmt.Println("badauth")
+				return
+			}
 		} else {
-			fmt.Println(recordId)
-			return
+			var updateDnsApi string = strings.Join([]string{CFApi, username, "/dns_records/", recordId}, "")
+			_, _, success := CloudFlareApi(updateDnsApi, "PUT", password, data, false)
+			if success {
+				fmt.Println("good")
+				return
+			} else {
+				fmt.Println("badauth")
+				return
+			}
 		}
 	}
 	fmt.Println("badauth")
 	return
-	// fmt.Println(proxy, username, password, hostname, ipAddr, ip, recordType)
 }
 
 // ParseIP Parse IP Type
@@ -102,11 +125,12 @@ func ParseIP(s string) (net.IP, int) {
 
 // GetIpAddr get ip addr
 func GetIpAddr() (i string) {
-	ip, err := getData("https://www.taobao.com/help/getip.php")
+	ip, err := getData("https://www.taobao.com/help/getip.php", "GET", []byte(""), "")
 	if err == nil {
-		length := len(ip)
-		start := strings.Index(ip, `ip:"`)
-		a := ip[start+4 : length]
+		ips := string(ip)
+		length := len(ips)
+		start := strings.Index(ips, `ip:"`)
+		a := ips[start+4 : length]
 		end := strings.Index(a, `"}`)
 		i = a[0:end]
 	}
@@ -114,66 +138,58 @@ func GetIpAddr() (i string) {
 }
 
 // getData get data
-func getData(u string) (s string, err error) {
-	res, err := http.Get(u)
-	if err != nil {
-		return "error", err
-	}
-	if res != nil {
-		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			return "error", err
-		}
-		d, _ := ioutil.ReadAll(res.Body)
-		s = string(d)
-	}
-	return s, nil
-}
-
-// GetCurrentIP Get Current IP
-func GetCurrentIP(username string, password string, hostname string, recordType string) (recordIp string, recordId string, resSuccess bool) {
+func getData(url string, types string, data []byte, password string) (s []byte, err error) {
 	client := &http.Client{}
-	url := strings.Join([]string{"https://api.cloudflare.com/client/v4/zones/", username, "/dns_records?type=", recordType, "&name=", hostname}, "")
-	reqest, err := http.NewRequest("GET", url, nil)
+	reqest, err := http.NewRequest(types, url, bytes.NewBuffer(data))
 
-	reqest.Header.Add("Authorization", strings.Join([]string{"Bearer", password}, " "))
+	if len(password) > 0 {
+		reqest.Header.Add("Authorization", strings.Join([]string{"Bearer", password}, " "))
+	}
 
 	if err != nil {
-		fmt.Println(err)
+		return []byte(""), err
 	}
 	response, err := client.Do(reqest)
 	if err != nil {
-		fmt.Println(err)
+		return []byte(""), err
 	}
 	defer response.Body.Close()
-	d, _ := ioutil.ReadAll(response.Body)
+	d, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return []byte(""), err
+	}
+	return d, nil
+}
+
+// CloudFlareApi Cloud Flare Api
+func CloudFlareApi(url string, types string, password string, data []byte, getIP bool) (recordIp string, recordId string, resSuccess bool) {
+	d, err := getData(url, types, data, password)
+	if err != nil {
+		return "", "", false
+	}
 	var p *Success
 	//3.json解析到结构体
 	if err := json.Unmarshal(d, &p); err != nil {
-		fmt.Println(err)
+		return "", "", p.Success
 	}
 	if p.Success {
-		return p.Result[0].ID, p.Result[0].Content, p.Success
+		if getIP {
+			return p.Result[0].ID, p.Result[0].Content, p.Success
+		}
+		return "", "", p.Success
 	}
 	return "", "", p.Success
 }
 
-// postData
-func postData(url string, proxy string, ipAddr string, hostname string, recordType string) (bd []byte, f bool) {
-	data := make(map[string]string)
-	data["type"] = recordType
-	data["name"] = hostname
-	data["content"] = ipAddr
-	data["proxied"] = proxy
-	b, _ := json.Marshal(data)
-
-	resp, err := http.Post(url,
-		"application/json",
-		bytes.NewBuffer(b))
-	if err != nil {
-		return []byte(""), false
+// MakePostData Make post data
+func MakePostData(proxy bool, ipAddr string, hostname string, recordType string) (bd []byte) {
+	var d *PostData
+	d = &PostData{
+		Type:    recordType,
+		Name:    hostname,
+		Content: ipAddr,
+		Proxied: proxy,
 	}
-	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-	return body, true
+	b, _ := json.Marshal(d)
+	return b
 }
