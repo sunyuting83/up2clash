@@ -2,7 +2,7 @@
 process="clash"
 
 # 获取进程ID
-PID=$(ps -C "$process" --no-header |wc -l)
+PID=$(ps -o comm|grep "$process"| wc -l)
 
 case "$1" in
 start)
