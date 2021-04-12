@@ -40,16 +40,6 @@ set_clash_iptables(){
 reset_iptables
 set_clash_iptables
 
-#开启转发# curl ip.sb
-# sudo ip link set ovs_eth1 promisc on
-# sudo ip link set ovs_eth1 promisc on docker
-# sudo docker network create -d macvlan --subnet=192.168.2.0/24 --gateway=192.168.2.1 -o parent=ovs_eth1 macnet
-
-# sudo docker run --name clash_tp -d -v /var/services/homes/admin/clash:/clash_config --sysctl net.ipv4.ip_forward=1 --network macnet --ip 192.168.2.118 --mac-address 00:50:56:00:60:42 --privileged zhangyi2018/clash_transparent_proxy:1.0.7
-
-
-#echo "1" > /proc/sys/net/ipv4/ip_forward
-
-/bin/sh /etc/clash/clash.sh start
-
+nohup /etc/up2c/up2c > /dev/null 2>&1 &
+nohup /etc/clash/clash-linux-amd64 -d /etc/clash > /dev/null 2>&1
 exec "$@"

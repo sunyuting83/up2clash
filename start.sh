@@ -1,12 +1,12 @@
-# 进程名
+#!/bin/sh
 process="up2c"
 
-# 获取进程ID
-PID=$(ps -o comm|grep "$process"| wc -l)
+
+PID=$(ps -o pid,comm | grep "$process" | grep -v grep | awk '{print $1}')
 
 case "$1" in
 start)
-  if [ "$PID" -eq 0 ]; then
+  if [ `echo ${PID} | awk -v tem=0 '{print($1>tem)? "1":"0"}'` -eq 0 ]; then
     nohup /etc/up2c/up2c > /dev/null 2>&1 &
     echo "The "$process" is start..."
   else
@@ -14,7 +14,7 @@ start)
   fi
   ;;
 restart)
-  if [ "$PID" -eq 0 ]; then
+  if [ `echo ${PID} | awk -v tem=0 '{print($1>tem)? "1":"0"}'` -eq 0 ]; then
     echo "The "$process" not running..."
   else
     kill -9 $PID
@@ -23,7 +23,7 @@ restart)
   fi
   ;;
 stop)
-  if [ "$PID" -eq 0 ]; then
+  if [ `echo ${PID} | awk -v tem=0 '{print($1>tem)? "1":"0"}'` -eq 0 ]; then
     echo "The not running..."
   else
     kill -9 "$PID"
@@ -31,7 +31,7 @@ stop)
   fi
   ;;
 status)
-  if [ "$PID" -eq 0 ]; then
+  if [ `echo ${PID} | awk -v tem=0 '{print($1>tem)? "1":"0"}'` -eq 0 ]; then
     echo "The "$process" not running..."
   else
     echo "The "$process" is running"
