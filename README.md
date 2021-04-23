@@ -34,21 +34,28 @@ sudo docker network create -d ipvlan \
 ipnet
 ```
 
+#### 新建resolv.conf文件
+- 文件内容
+```
+nameserver 127.0.0.1
+#把127.0.0.1改成你的网关地址
+```
+
 #### 运行容器
 > 将resolv.conf修改成你的网关ip
 - 食用有线网卡
 ```
-sudo docker run -it --name clash_tp -d -v /your/path/resolv.conf:/etc/resolv.conf --sysctl net.ipv4.ip_forward=1 --network macnet --ip 192.168.0.119 --mac-address 00:50:56:00:60:42 --privileged v2rss/clash_transparent_proxy
+sudo docker run -it --name clash_tp -d -v /your/path/resolv.conf:/etc/resolv.conf --sysctl net.ipv4.ip_forward=1 --network macnet --ip 192.168.0.119 --mac-address 00:50:56:00:60:42 --privileged --restart=always v2rss/clash_transparent_proxy
 ```
 - 食用无线网卡
 ```
-sudo docker run -it --name clash_tp -d --sysctl net.ipv4.ip_forward=1 --network ipnet --ip 192.168.0.119 -v /your/path/resolv.conf:/etc/resolv.conf --privileged v2rss/clash_transparent_prox
+sudo docker run -it --name clash_tp -d --sysctl net.ipv4.ip_forward=1 --network ipnet --ip 192.168.0.119 -v /your/path/resolv.conf:/etc/resolv.conf --privileged --restart=always v2rss/clash_transparent_prox
 ```
 
 #### 容器参数说明
 | 参数  | 说明 | 传入值 |
 | ------------ | ------------ | ------------ |
-| -v | 将resolv.conf修改成你的网关ip | 你的resolv.conf文件位置 |
+| -v | 将resolv.conf修改成你的网关ip | 新建的resolv.conf文件位置 |
 | --sysctl | 开启流量转发 | 必须 |
 | --ip | 修改成你需要固定的IP地址 | 同一网段不被占用的IP |
 
