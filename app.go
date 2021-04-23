@@ -131,8 +131,8 @@ dns:
   - 'proxy.golang.org'
 ##Custom fake-ip-filter END##
   nameserver:
-  - 114.114.114.114
-  - 119.29.29.29
+  - 223.5.5.5
+  - 8.8.8.8
   fallback:
   - https://cloudflare-dns.com/dns-query
   - https://dns.google/dns-query
